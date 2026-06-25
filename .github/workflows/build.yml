@@ -1,0 +1,48 @@
+name: Build ESP32-S3 Firmware
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # 允許手動觸發
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Arduino CLI
+      uses: arduino/setup-arduino-cli@v2
+
+    - name: Install ESP32 Core
+      run: |
+        arduino-cli config init
+        arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+        arduino-cli core update-index
+        arduino-cli core install esp32:esp32
+
+    - name: Compile Sketch for ESP32-S3 N32R16V
+      run: |
+        # FQBN 設定說明：
+        # esp32:esp32:esp32s3 : 選擇 ESP32-S3 開發板
+        # CDCOnBoot=cdc : 啟用 USB CDC (讓 COM5 可以作為 Serial 輸出)
+        # FlashSize=32M : 設定 32MB Flash (N32)
+        # PSRAM=opi : 設定 16MB OPI PSRAM (R16)
+        # PartitionScheme=default_32M : 使用 32MB 專用的分區表
+        
+        mkdir -p build
+        arduino-cli compile \
+          --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=32M,PSRAM=opi,PartitionScheme=default_32M \
+          --build-property "build.extra_flags=-DBOARD_HAS_PSRAM" \
+          --output-dir build \
+          esp32_wifi_scanner.ino
+
+    - name: Upload .bin Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ESP32-S3-WiFi-Scanner-Bin
+        path: build/*.bin
