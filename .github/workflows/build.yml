@@ -27,19 +27,24 @@ jobs:
 
     - name: Compile Sketch for ESP32-S3 N32R16V
       run: |
-        # FQBN 設定說明：
-        # esp32:esp32:esp32s3 : 選擇 ESP32-S3 開發板
-        # CDCOnBoot=cdc : 啟用 USB CDC (讓 COM5 可以作為 Serial 輸出)
-        # FlashSize=32M : 設定 32MB Flash (N32)
-        # PSRAM=opi : 設定 16MB OPI PSRAM (R16)
-        # PartitionScheme=default_32M : 使用 32MB 專用的分區表
+        # 自動尋找根目錄下的第一個 .ino 檔案
+        INO_FILE=$(find . -maxdepth 1 -name "*.ino" | head -n 1)
+        
+        # 檢查是否找到檔案
+        if [ -z "$INO_FILE" ]; then
+          echo "❌ 錯誤: 在根目錄找不到 .ino 檔案，請確認已上傳程式碼。"
+          exit 1
+        fi
+        echo "✅ 找到程式碼檔案: $INO_FILE"
         
         mkdir -p build
+        
+        # 編譯指令 (已修正 PartitionScheme 參數為 default_32MB)
         arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=32M,PSRAM=opi,PartitionScheme=default_32M \
+          --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=32M,PSRAM=opi,PartitionScheme=default_32MB \
           --build-property "build.extra_flags=-DBOARD_HAS_PSRAM" \
           --output-dir build \
-          esp32_wifi_scanner.ino
+          "$INO_FILE"
 
     - name: Upload .bin Artifact
       uses: actions/upload-artifact@v4
