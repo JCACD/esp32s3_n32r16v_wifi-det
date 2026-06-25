@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # 允許手動觸發
+  workflow_dispatch:
 
 jobs:
   build:
@@ -27,24 +27,33 @@ jobs:
 
     - name: Compile Sketch for ESP32-S3 N32R16V
       run: |
-        # 自動尋找根目錄下的第一個 .ino 檔案
+        # 1. 自動尋找根目錄下的 .ino 檔案
         INO_FILE=$(find . -maxdepth 1 -name "*.ino" | head -n 1)
-        
-        # 檢查是否找到檔案
+
         if [ -z "$INO_FILE" ]; then
-          echo "❌ 錯誤: 在根目錄找不到 .ino 檔案，請確認已上傳程式碼。"
+          echo "❌ 錯誤: 在根目錄找不到 .ino 檔案"
           exit 1
         fi
         echo "✅ 找到程式碼檔案: $INO_FILE"
-        
+
+        # 2. 取得檔案名稱（不含副檔名）
+        SKETCH_NAME=$(basename "$INO_FILE" .ino)
+        echo "📁 Sketch 名稱: $SKETCH_NAME"
+
+        # 3. 建立與 .ino 同名的子資料夾
+        SKETCH_DIR="sketch/${SKETCH_NAME}"
+        mkdir -p "$SKETCH_DIR"
+
+        # 4. 將 .ino 檔案複製到正確的資料夾中
+        cp "$INO_FILE" "${SKETCH_DIR}/${SKETCH_NAME}.ino"
+
+        # 5. 編譯 (已修正 PartitionScheme 為 default)
         mkdir -p build
-        
-        # 編譯指令 (已修正 PartitionScheme 參數為 default_32MB)
         arduino-cli compile \
-          --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=32M,PSRAM=opi,PartitionScheme=default_32MB \
+          --fqbn esp32:esp32:esp32s3:CDCOnBoot=cdc,FlashSize=32M,PSRAM=opi,PartitionScheme=default \
           --build-property "build.extra_flags=-DBOARD_HAS_PSRAM" \
           --output-dir build \
-          "$INO_FILE"
+          "$SKETCH_DIR"
 
     - name: Upload .bin Artifact
       uses: actions/upload-artifact@v4
